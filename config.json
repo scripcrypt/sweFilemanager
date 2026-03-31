@@ -1,0 +1,15 @@
+{
+	"defaultRoot": "demo",
+	"content": true,
+	"icons": {
+		"folder": "",
+		"file": "",
+		"ext": {}
+	},
+	"roots": {
+		"demo": {
+			"label": "web",
+			"path": "../"
+		}
+	}
+}

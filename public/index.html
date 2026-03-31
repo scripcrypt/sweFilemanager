@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>sweFilemanager</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!--
+      sweFilemanager の UI ルート。
+      - CSS は `.sweFilemanager` 配下にスコープしている
+      - JS は各要素を id で取得してイベント/描画を行う
+    -->
+    <div class="sweFilemanager">
+      <header class="swefm-topbar">
+        <div class="swefm-brand">sweFilemanager</div>
+        <div class="swefm-actions">
+          <!-- ルート切替（config.json の roots） -->
+          <select id="root-select" class="swefm-select"></select>
+          <!-- 表示モード切替 -->
+          <button id="btn-view-list">リスト</button>
+          <button id="btn-view-icons">アイコン</button>
+          <!-- ナビゲーション/操作 -->
+          <button id="btn-up">上へ</button>
+          <button id="btn-refresh">更新</button>
+          <button id="btn-mkdir">フォルダ作成</button>
+          <button id="btn-touch">ファイル作成</button>
+          <label class="swefm-upload">
+            <input id="file-upload" type="file" />
+            <span>アップロード</span>
+          </label>
+        </div>
+      </header>
+
+      <main class="swefm-workbench">
+        <aside class="swefm-sidebar">
+          <div class="swefm-sidebar-title">EXPLORER</div>
+          <div class="swefm-sidebar-section">
+            <div class="swefm-sidebar-section-title">FILES</div>
+            <!-- 左ツリー（フォルダ/ファイル）。JS が中身を描画する -->
+            <div id="tree" class="swefm-tree" role="tree" aria-label="Explorer"></div>
+          </div>
+        </aside>
+
+        <section class="swefm-content">
+          <!-- パンくず（現在パス） -->
+          <div class="swefm-path" id="breadcrumb"></div>
+          <div class="swefm-panel">
+            <!-- アイコン表示（grid）。JS が切替/描画する -->
+            <div id="grid" class="swefm-grid" hidden></div>
+            <!-- リスト表示（table）。JS が描画する -->
+            <table id="table" class="swefm-table">
+              <thead>
+                <tr>
+                  <th>名前</th>
+                  <th class="col-size">サイズ</th>
+                  <th class="col-mtime">更新</th>
+                  <th class="col-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+          <!-- ステータス表示（エラー/進捗テキストなど） -->
+          <div class="swefm-status" id="status"></div>
+        </section>
+      </main>
+
+      <!-- エントリポイント（store/commands/view を初期化） -->
+      <script type="module" src="./main.js"></script>
+    </div>
+  </body>
+</html>
