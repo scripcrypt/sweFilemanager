@@ -204,6 +204,8 @@ window.sweFilemanagerOnSelectTree = ({ root, paths, primaryPath }) => {
 
 ## API
 
+### サーバー側は各自でご用意いただく前提で、サンプルとしてこちらを用意しました。
+
 エンドポイント:
 
 - `public/api.php?action=...`
@@ -258,3 +260,11 @@ npm run dev
 ### download は JSON ではありません
 
 `download` はブラウザをダウンロード URL に遷移させて取得するため、ファイルのバイト列が返ります（JSON ではありません）。
+
+
+<br><br>
+
+## 免責
+```md
+本リポジトリのソースコードは MIT ライセンスです。
+基本的に自由に利用できますが、詳細は各ソースファイル内のコメントをご確認ください。

@@ -5,8 +5,17 @@ import { createVsCodeExplorerView } from './views/vscodeExplorerView.js';
 
 // `public/` 配下で開いた場合と、プロジェクト直下で開いた場合で
 // API の相対パスが変わるため、現在の URL から baseUrl を決める。
-const isUnderPublic = window.location.pathname.includes('/public/');
-const apiBaseUrl = isUnderPublic ? './api.php' : './public/api.php';
+//
+// IMPORTANT:
+// `https://host/filemanager` のように末尾 `/` が無い URL で開かれると、
+// `./public/api.php` は `https://host/public/api.php`（ルート直下）として解決され得る。
+// そのため、URL を必ず「ディレクトリ URL（末尾 `/` あり）」として正規化してから解決する。
+const baseUrl = new URL(window.location.href);
+if (!baseUrl.pathname.endsWith('/')) {
+	baseUrl.pathname = `${baseUrl.pathname}/`;
+}
+const isUnderPublic = baseUrl.pathname.includes('/public/');
+const apiBaseUrl = new URL(isUnderPublic ? './api.php' : './public/api.php', baseUrl).toString();
 const api = createApi({ baseUrl: apiBaseUrl });
 
 // ディレクトリごとの表示モード（list/icons）を永続化する Cookie 名
