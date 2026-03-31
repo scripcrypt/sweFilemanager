@@ -3,19 +3,13 @@ import { createStore } from './core/store.js';
 import { createCommands } from './core/commands.js';
 import { createVsCodeExplorerView } from './views/vscodeExplorerView.js';
 
-// `public/` 配下で開いた場合と、プロジェクト直下で開いた場合で
-// API の相対パスが変わるため、現在の URL から baseUrl を決める。
+// API の URL は「このモジュール自身（main.js）の配置場所」を基準に解決する。
 //
-// IMPORTANT:
-// `https://host/filemanager` のように末尾 `/` が無い URL で開かれると、
-// `./public/api.php` は `https://host/public/api.php`（ルート直下）として解決され得る。
-// そのため、URL を必ず「ディレクトリ URL（末尾 `/` あり）」として正規化してから解決する。
-const baseUrl = new URL(window.location.href);
-if (!baseUrl.pathname.endsWith('/')) {
-	baseUrl.pathname = `${baseUrl.pathname}/`;
-}
-const isUnderPublic = baseUrl.pathname.includes('/public/');
-const apiBaseUrl = new URL(isUnderPublic ? './api.php' : './public/api.php', baseUrl).toString();
+// こうしておくと、以下のどの配置でも壊れにくい:
+// - `/public/index.html` から `./main.js` を読み、同じ階層の `./api.php` を叩く
+// - プロジェクト直下の `index.html` から `./public/main.js` を読み、`./public/api.php` を叩く
+// - Railway 等で `public/` の中身がサイトルート（`/`）に配置され、`/api.php` を叩く
+const apiBaseUrl = new URL('./api.php', import.meta.url).toString();
 const api = createApi({ baseUrl: apiBaseUrl });
 
 // ディレクトリごとの表示モード（list/icons）を永続化する Cookie 名
