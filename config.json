@@ -8,8 +8,8 @@
 	},
 	"roots": {
 		"demo": {
-			"label": "web",
-			"path": "../"
+			"label": "data",
+			"path": "./data"
 		}
 	}
 }

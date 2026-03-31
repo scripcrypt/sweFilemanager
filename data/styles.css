@@ -1,0 +1,523 @@
+/*
+  sweFilemanager UI の基本スタイル
+  - 可能な限り `.sweFilemanager` 配下にスコープして他ページへ影響しないようにする
+*/
+
+/* テーマ変数（色/余白/スクロールバー） */
+:root {
+	--bg: rgb(32, 32, 32);
+	--panel: rgb(45, 45, 45);
+	--text: rgb(224, 224, 212);
+	--muted: rgb(185, 185, 185);
+	--border: rgba(255, 255, 255, 0.08);
+	--accent: rgb(126, 183, 254);
+	--danger: #f14c4c;
+	--sidebar: rgb(45, 45, 45);
+	--sidebar-border: rgba(255, 255, 255, 0.08);
+	--row-hover: rgba(255, 255, 255, 0.10);
+	--scrollbar-thumb-width: 5px;
+	--scrollbar-thumb-color: rgb(75, 105, 125);
+}
+
+body {
+	margin: 0;
+}
+
+/* アプリ全体（フォント/背景/文字色） */
+.sweFilemanager {
+	font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+	font-size: 14px !important;
+	background: var(--bg);
+	color: var(--text);
+	min-height: 100vh;
+}
+
+.sweFilemanager,
+.sweFilemanager * {
+	box-sizing: border-box;
+}
+[hidden] {
+	display: none !important;
+}
+
+/* スクロールバー */
+.sweFilemanager *::-webkit-scrollbar {
+	width: var(--scrollbar-thumb-width);
+}
+.sweFilemanager *::-webkit-scrollbar-track {
+	background-color: transparent;
+}
+.sweFilemanager *::-webkit-scrollbar-thumb {
+	background: var(--scrollbar-thumb-color);
+}
+
+/* トップバー（タイトル/各種ボタン/ルート選択） */
+.sweFilemanager .swefm-topbar {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--border);
+	backdrop-filter: blur(10px);
+	background: var(--panel);
+}
+.sweFilemanager .swefm-brand {
+	font-weight: 700;
+	letter-spacing: 0.3px;
+}
+.sweFilemanager .swefm-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+.sweFilemanager .swefm-select {
+	border: 1px solid var(--border);
+	background: rgb(60, 60, 60);
+	color: var(--text);
+	padding: 8px 10px;
+	border-radius: 10px;
+	outline: none;
+}
+.sweFilemanager .swefm-select:focus {
+	border-color: rgba(55, 148, 255, 0.35);
+}
+.sweFilemanager button {
+	border: 1px solid var(--border);
+	background: transparent;
+	color: var(--text);
+	padding: 8px 10px;
+	border-radius: 10px;
+	cursor: pointer;
+}
+.sweFilemanager button:hover {
+	border-color: rgba(255, 255, 255, 0.22);
+}
+.sweFilemanager button.active {
+	border-color: rgba(126, 183, 254, 0.55);
+	background: rgba(126, 183, 254, 0.22);
+}
+.sweFilemanager button.danger {
+	border-color: rgba(255, 107, 107, 0.35);
+	color: #ffd1d1;
+}
+.sweFilemanager .swefm-upload {
+	border: 1px dashed rgba(255, 255, 255, 0.2);
+	padding: 8px 10px;
+	border-radius: 10px;
+	cursor: pointer;
+	color: var(--text);
+}
+.sweFilemanager .swefm-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ワークベンチ（左ツリー + 右ペインの2カラム） */
+.sweFilemanager .swefm-workbench {
+	height: calc(100vh - 49px);
+	display: grid;
+	grid-template-columns: 280px 1fr;
+}
+.sweFilemanager.swefm-no-content .swefm-workbench {
+	grid-template-columns: 280px;
+}
+
+/* 左サイドバー */
+.sweFilemanager .swefm-sidebar {
+	border-right: 1px solid var(--sidebar-border);
+	background: var(--sidebar);
+	padding: 10px 8px;
+	overflow: auto;
+}
+.sweFilemanager .swefm-sidebar-title {
+	font-size: 11px;
+	letter-spacing: 0.6px;
+	color: var(--muted);
+	padding: 6px 8px 10px;
+}
+.sweFilemanager .swefm-sidebar-section {
+	border-top: 1px solid rgba(255, 255, 255, 0.06);
+	padding-top: 10px;
+}
+.sweFilemanager .swefm-sidebar-section-title {
+	font-size: 11px;
+	color: var(--muted);
+	padding: 6px 8px;
+	display: none;
+}
+.sweFilemanager .swefm-content {
+	padding: 14px 16px 20px;
+	overflow: auto;
+}
+.sweFilemanager .swefm-path {
+	color: var(--muted);
+	margin-bottom: 12px;
+	font-size: 13px;
+}
+.sweFilemanager .swefm-path a {
+	color: var(--text);
+	text-decoration: none;
+}
+.sweFilemanager .swefm-path a:hover {
+	text-decoration: underline;
+}
+.sweFilemanager .swefm-panel {
+	border: 1px solid var(--border);
+	border-radius: 14px;
+	overflow: hidden;
+	background: rgba(255, 255, 255, 0.03);
+	user-select: none;
+}
+.sweFilemanager .swefm-grid {
+	padding: 12px;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: 10px;
+}
+.sweFilemanager .grid-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+}
+.sweFilemanager .grid-item.is-dir {
+	background: rgba(197, 161, 90, 0.10);
+}
+.sweFilemanager .grid-item.selected {
+	background: rgba(55, 148, 255, 0.18);
+	outline: 1px solid rgba(55, 148, 255, 0.22);
+}
+.sweFilemanager .grid-item.drop-target {
+	background: rgba(126, 183, 254, 0.22);
+	outline: 1px dashed rgba(126, 183, 254, 0.55);
+}
+.sweFilemanager .grid-top {
+	width: 100%;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px;
+}
+.sweFilemanager .grid-icon {
+	width: 56px;
+	height: 56px;
+}
+.sweFilemanager .grid-thumb {
+	width: 56px;
+	height: 56px;
+	object-fit: cover;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.10);
+	background: rgba(0, 0, 0, 0.15);
+}
+.sweFilemanager .grid-name {
+  font-size: 12px;
+  line-height: 1.2;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sweFilemanager .grid-name input {
+  width: 100%;
+  min-width: 0;
+}
+.sweFilemanager .grid-meta {
+	font-size: 11px;
+	color: var(--muted);
+}
+.sweFilemanager .grid-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	align-items: stretch;
+}
+.sweFilemanager .grid-actions button {
+	padding: 3px 4px;
+	border-radius: 6px;
+	font-size: 11px;
+	opacity: 0.65;
+	white-space: nowrap;
+}
+.sweFilemanager .grid-actions button:hover {
+	opacity: 1;
+}
+.sweFilemanager .swefm-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+.sweFilemanager th,
+.sweFilemanager td {
+	padding: 10px 12px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sweFilemanager thead th {
+	font-size: 12px;
+	color: var(--muted);
+	text-align: left;
+}
+.sweFilemanager tbody tr:hover {
+	background: var(--row-hover);
+}
+.sweFilemanager tbody tr.is-dir {
+	background: rgba(197, 161, 90, 0.12);
+}
+.sweFilemanager tbody tr.selected {
+	background: rgba(55, 148, 255, 0.18);
+	outline: 1px solid rgba(55, 148, 255, 0.22);
+}
+.sweFilemanager tbody tr.drop-target {
+	background: rgba(126, 183, 254, 0.22);
+	outline: 1px dashed rgba(126, 183, 254, 0.55);
+}
+.sweFilemanager .col-size {
+	width: 130px;
+}
+.sweFilemanager .col-mtime {
+	width: 180px;
+}
+.sweFilemanager .col-actions {
+	width: 240px;
+}
+.sweFilemanager .name {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+.sweFilemanager .badge {
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	color: var(--muted);
+}
+.sweFilemanager .link {
+	color: var(--text);
+	text-decoration: none;
+}
+.sweFilemanager .link:hover {
+	text-decoration: underline;
+}
+.sweFilemanager .row-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+.sweFilemanager .swefm-tree {
+	font-size: 13px;
+	padding: 4px 4px 12px;
+}
+.sweFilemanager .tree-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 6px;
+	border-radius: 6px;
+	cursor: pointer;
+	user-select: none;
+	color: var(--text);
+}
+.sweFilemanager .tree-item:hover {
+	background: var(--row-hover);
+}
+.sweFilemanager .tree-item.is-cwd {
+	background: rgba(197, 161, 90, 0.14);
+}
+.sweFilemanager .tree-item[aria-selected="true"] {
+	background: rgba(55, 148, 255, 0.18);
+	outline: 1px solid rgba(55, 148, 255, 0.22);
+}
+.sweFilemanager .tree-item.drop-target {
+	background: rgba(126, 183, 254, 0.22);
+	outline: 1px dashed rgba(126, 183, 254, 0.55);
+}
+.sweFilemanager .tree-indent {
+	width: 14px;
+	flex: 0 0 14px;
+}
+.sweFilemanager .tree-twist {
+	width: 14px;
+	height: 14px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--muted);
+}
+.sweFilemanager .tree-label {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.sweFilemanager .swefm-icon-img {
+	width: 14px;
+	height: 14px;
+	display: inline-block;
+	flex: 0 0 14px;
+	object-fit: contain;
+	vertical-align: middle;
+}
+.sweFilemanager .swefm-icon-img.grid-icon {
+	width: 56px;
+	height: 56px;
+	flex: 0 0 56px;
+}
+.sweFilemanager .icon {
+	width: 14px;
+	height: 14px;
+	display: inline-block;
+	flex: 0 0 14px;
+	background-color: var(--icon-color, var(--muted));
+}
+.sweFilemanager .swefm-grid .icon.grid-icon {
+	width: 56px;
+	height: 56px;
+	flex: 0 0 56px;
+}
+.sweFilemanager .swefm-grid .grid-thumb {
+	width: 56px;
+	height: 56px;
+}
+.sweFilemanager .icon-folder {
+	--icon-color: #c5a15a;
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M10 4l2 2h8a2 2 0 0 1 2 2v10a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h6zm-6 4v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8H4z'/%3E%3C/svg%3E") no-repeat center / contain;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M10 4l2 2h8a2 2 0 0 1 2 2v10a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h6zm-6 4v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8H4z'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+.sweFilemanager .icon-file {
+	--icon-color: #9aa0a6;
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M14 2H7a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8l-6-6zm1 2.5L19.5 9H15V4.5zM7 4h6v6h6v9a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") no-repeat center / contain;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M14 2H7a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8l-6-6zm1 2.5L19.5 9H15V4.5zM7 4h6v6h6v9a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+.sweFilemanager .ext-js {
+	--icon-color: #f7df1e;
+}
+.sweFilemanager .ext-ts {
+	--icon-color: #3178c6;
+}
+.sweFilemanager .ext-json {
+	--icon-color: #f5c542;
+}
+.sweFilemanager .ext-html {
+	--icon-color: #e34f26;
+}
+.sweFilemanager .ext-css {
+	--icon-color: #1572b6;
+}
+.sweFilemanager .ext-md {
+	--icon-color: #cdd6f4;
+}
+.sweFilemanager .ext-php {
+	--icon-color: #777bb4;
+}
+.sweFilemanager .ext-png, .sweFilemanager .ext-jpg, .sweFilemanager .ext-jpeg, .sweFilemanager .ext-gif, .sweFilemanager .ext-webp, .sweFilemanager .ext-svg {
+	--icon-color: #9cdcfe;
+}
+.sweFilemanager .swefm-tree .ext-zip, .sweFilemanager .swefm-tree .ext-tar, .sweFilemanager .swefm-tree .ext-gz, .sweFilemanager .swefm-tree .ext-7z, .sweFilemanager .swefm-tree .ext-rar {
+	--icon-color: #d7ba7d;
+}
+.sweFilemanager .swefm-status {
+	margin-top: 10px;
+	font-size: 12px;
+	color: var(--muted);
+}
+
+.sweFilemanager .swefm-ctxmenu {
+	position: fixed;
+	z-index: 50;
+	min-width: 160px;
+	padding: 6px;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.10);
+	background: rgb(50, 50, 50);
+	box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+	display: grid;
+	gap: 6px;
+}
+
+.sweFilemanager .swefm-ctxitem {
+	width: 100%;
+	text-align: left;
+	border-radius: 10px;
+	padding: 8px 10px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.02);
+}
+
+.sweFilemanager .swefm-ctxitem:hover {
+	border-color: rgba(255, 255, 255, 0.22);
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.sweFilemanager .swefm-ctxitem.danger {
+	border-color: rgba(255, 107, 107, 0.35);
+	color: #ffd1d1;
+}
+
+.sweFilemanager .swefm-prop-popover {
+	position: fixed;
+	z-index: 60;
+	width: min(520px, calc(100vw - 24px));
+}
+
+.sweFilemanager .swefm-prop-dialog {
+	border-radius: 14px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgb(45, 45, 45);
+	box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+
+.sweFilemanager .swefm-prop-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 12px 12px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sweFilemanager .swefm-prop-title {
+	font-weight: 700;
+}
+
+.sweFilemanager .swefm-prop-close {
+	padding: 4px 10px;
+	border-radius: 10px;
+}
+
+.sweFilemanager .swefm-prop-body {
+	padding: 12px;
+	display: grid;
+	gap: 8px;
+}
+
+.sweFilemanager .swefm-prop-row {
+	display: grid;
+	grid-template-columns: 120px 1fr;
+	gap: 10px;
+	padding: 8px 10px;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.03);
+}
+
+.sweFilemanager .swefm-prop-key {
+	color: var(--muted);
+}
+
+.sweFilemanager .swefm-prop-val {
+	word-break: break-all;
+}
