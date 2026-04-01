@@ -2,7 +2,7 @@
 
 ブラウザで動作するリモート・ファイルマネージャです。
 
-<img src="screencapture.png">
+<img src="screencapture2.png">
 <br>
 
 ## Live Demo
