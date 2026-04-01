@@ -3,7 +3,6 @@
 ブラウザで動作するリモート・ファイルマネージャです。
 
 <img src="screencapture2.png">
-<br>
 
 ## Live Demo
 [こちらで動作確認ができます](https://swefilemanager-production.up.railway.app)
