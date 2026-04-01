@@ -1338,7 +1338,7 @@ export function createVsCodeExplorerView({ store, commands }) {
 
     function treeSetSelectionOnly(path, { anchorIndex = null } = {}) {
       // 左ツリー: 単一選択
-      selectedTreePaths = new Set(path ? [path] : []);
+      selectedTreePaths = new Set(path == null ? [] : [path]);
       treeSelectionAnchorIndex = anchorIndex;
       emitTreeSelection(Array.from(selectedTreePaths));
       rerenderTreeOnly();
@@ -1364,7 +1364,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       const next = new Set();
       for (let i = from; i <= to; i += 1) {
         const p = visiblePaths[i];
-        if (p) next.add(p);
+        if (p != null) next.add(p);
       }
       selectedTreePaths = next;
       emitTreeSelection(Array.from(selectedTreePaths));
