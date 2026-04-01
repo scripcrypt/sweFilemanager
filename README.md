@@ -7,7 +7,7 @@
 
 ## Live Demo
 [こちらで動作確認ができます](https://swefilemanager-production.up.railway.app)
-<br>
+<br><br>
 
 - UI: VS Code 風 Explorer（左ツリー + 任意の右コンテンツ領域）
 - Backend: PHP（`public/api.php`）
