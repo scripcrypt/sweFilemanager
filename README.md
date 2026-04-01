@@ -2,6 +2,12 @@
 
 ブラウザで動作するリモート・ファイルマネージャです。
 
+<img src="screencapture.png">
+<br>
+
+## Live Demo
+[こちらで動作確認ができます](https://swefilemanager-production.up.railway.app)
+
 - UI: VS Code 風 Explorer（左ツリー + 任意の右コンテンツ領域）
 - Backend: PHP（`public/api.php`）
 - Frontend: ES Modules（`public/main.js`）
