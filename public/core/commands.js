@@ -203,6 +203,42 @@ export function createCommands({ api, store }) {
     await refresh();
   }
 
+  async function ensureDirExists(dirPath) {
+    // 指定パス（cwd からの相対）に必要なディレクトリを順に作成する。
+    // - 既に存在する場合はエラーになることがあるので握りつぶす
+    // - 空文字はルート（cwd）扱い
+    const { currentRoot, cwd } = store.getState();
+    const p = (dirPath ?? '').toString().replace(/\\/g, '/');
+    const parts = p.split('/').filter(Boolean);
+    let acc = '';
+    for (const name of parts) {
+      acc = acc ? `${acc}/${name}` : name;
+      try {
+        const parentRel = parentPath(acc);
+        const base = cwd ?? '';
+        const mkdirPath = parentRel ? `${base}/${parentRel}` : base;
+        await api.mkdir({ root: currentRoot, path: mkdirPath.replace(/\/+?/g, '/').replace(/^\/+/, ''), name });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  async function uploadFileTo(destDir, file, { reload = true } = {}) {
+    // 指定ディレクトリへアップロードする。
+    // - destDir は cwd からの相対（'' 可）
+    // - reload=true の場合のみ cwd を reload/refresh（大量アップロード時は false 推奨）
+    const { currentRoot, cwd } = store.getState();
+    const dir = (destDir ?? '').toString();
+    const raw = dir ? `${cwd ?? ''}/${dir}` : (cwd ?? '');
+    const uploadPath = raw.replace(/\/+?/g, '/').replace(/^\/+/, '');
+    await api.upload({ root: currentRoot, path: uploadPath, file });
+    if (reload) {
+      await reloadDir(cwd, { expand: true });
+      await refresh();
+    }
+  }
+
   async function statPath(path) {
     // プロパティ表示用の stat
     const { currentRoot } = store.getState();
@@ -248,6 +284,8 @@ export function createCommands({ api, store }) {
     movePaths,
     copyPaths,
     uploadFile,
+    uploadFileTo,
+    ensureDirExists,
     statPath,
     download,
     getDownloadUrl,

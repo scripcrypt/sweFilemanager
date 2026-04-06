@@ -63,10 +63,20 @@ export function createVsCodeExplorerView({ store, commands }) {
   const btnRefresh = document.getElementById('btn-refresh');
   const btnMkdir = document.getElementById('btn-mkdir');
   const btnTouch = document.getElementById('btn-touch');
+  const btnDelete = document.getElementById('btn-delete');
+  const btnUpload = document.getElementById('btn-upload');
   const btnViewList = document.getElementById('btn-view-list');
   const btnViewIcons = document.getElementById('btn-view-icons');
   const fileUpload = document.getElementById('file-upload');
   const rootSelect = document.getElementById('root-select');
+
+  const uploadModalEl = document.getElementById('upload-modal');
+  const uploadModalBackdropEl = document.getElementById('upload-modal-backdrop');
+  const btnUploadClose = document.getElementById('btn-upload-close');
+  const btnUploadChoose = document.getElementById('btn-upload-choose');
+  const uploadDropEl = document.getElementById('upload-drop');
+  const uploadBusyEl = document.getElementById('upload-busy');
+  const uploadLogEl = document.getElementById('upload-log');
 
   // 右ペイン: 作成/リネームのインライン入力状態
   let createDraft = null;
@@ -420,6 +430,11 @@ export function createVsCodeExplorerView({ store, commands }) {
     if (e.key === 'Escape') {
       hideContextMenu();
       hidePropertyModal();
+
+		// アップロードモーダルが開いている場合は閉じる
+		if (uploadModalEl && uploadModalEl.hidden === false) {
+			closeUploadModal();
+		}
       return;
     }
 
@@ -477,7 +492,11 @@ export function createVsCodeExplorerView({ store, commands }) {
     if (entry.isDir) {
       commands.navigate(entry.path);
     } else {
-      commands.download(entry.path);
+      // sweFilemanagerOnOpenFile が設定されていればそちらを優先し、
+      // 未設定または false 返却の場合のみダウンロードにフォールバック
+      if (!emitOpenFile(entry.path)) {
+        commands.download(entry.path);
+      }
     }
   }
 
@@ -743,6 +762,175 @@ export function createVsCodeExplorerView({ store, commands }) {
     statusEl.textContent = text;
   }
 
+  function setUploadBusy(busy) {
+    if (uploadBusyEl) uploadBusyEl.hidden = busy !== true;
+    if (btnUploadChoose) btnUploadChoose.disabled = busy === true;
+    if (btnUploadClose) btnUploadClose.disabled = busy === true;
+    if (uploadDropEl) uploadDropEl.style.pointerEvents = busy === true ? 'none' : '';
+    if (uploadModalBackdropEl) uploadModalBackdropEl.style.pointerEvents = busy === true ? 'none' : '';
+  }
+
+  function clearUploadLog() {
+    if (!uploadLogEl) return;
+    uploadLogEl.innerHTML = '';
+  }
+
+  function pushUploadLog(text) {
+    if (!uploadLogEl) return;
+    const el = document.createElement('div');
+    el.className = 'swefm-upload-log-item';
+    el.textContent = text;
+    uploadLogEl.appendChild(el);
+    const items = uploadLogEl.querySelectorAll('.swefm-upload-log-item');
+    if (items.length > 8) {
+      for (let i = 0; i < items.length - 8; i += 1) items[i].remove();
+    }
+    const remove = () => {
+      try {
+        el.remove();
+      } catch {
+        // ignore
+      }
+    };
+    el.addEventListener('animationend', remove, { once: true });
+    setTimeout(remove, 2200);
+  }
+
+  function openUploadModal() {
+    if (!uploadModalEl) return;
+    uploadModalEl.hidden = false;
+    uploadDropEl?.classList?.remove?.('is-dragover');
+    setUploadBusy(false);
+    clearUploadLog();
+  }
+
+  function closeUploadModal() {
+    if (!uploadModalEl) return;
+    uploadModalEl.hidden = true;
+    uploadDropEl?.classList?.remove?.('is-dragover');
+    setUploadBusy(false);
+    clearUploadLog();
+  }
+
+  async function uploadFiles(files) {
+    const list = Array.isArray(files) ? files : [];
+    if (list.length === 0) return;
+    setUploadBusy(true);
+    try {
+      for (let i = 0; i < list.length; i += 1) {
+        const name = list[i]?.name ? list[i].name : 'file';
+        pushUploadLog(`upload: ${name}`);
+        setStatus(list.length > 1 ? `アップロード中... (${i + 1}/${list.length})` : 'アップロード中...');
+        await commands.uploadFile(list[i]);
+      }
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  async function readEntry(entry, baseDir = '') {
+    const out = [];
+    if (!entry) return out;
+    if (entry.isFile) {
+      const file = await new Promise((resolve, reject) => {
+        try {
+          entry.file(resolve, reject);
+        } catch (e) {
+          reject(e);
+        }
+      });
+      out.push({ file, dir: baseDir });
+      return out;
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const childBase = baseDir ? `${baseDir}/${entry.name}` : entry.name;
+      while (true) {
+        const entries = await new Promise((resolve, reject) => {
+          try {
+            reader.readEntries(resolve, reject);
+          } catch (e) {
+            reject(e);
+          }
+        });
+        if (!entries || entries.length === 0) break;
+        for (const ent of entries) {
+          const sub = await readEntry(ent, childBase);
+          for (const it of sub) out.push(it);
+        }
+      }
+    }
+    return out;
+  }
+
+  function snapshotDrop(dt) {
+    // drop イベントの DataTransfer は非同期処理中に参照できなくなることがあるため、
+    // 必要な情報は同期的にスナップショットしておく。
+    const files = Array.from(dt?.files ?? []);
+    const items = Array.from(dt?.items ?? []);
+    const entries = items
+      .map((it) => {
+        try {
+          return typeof it.webkitGetAsEntry === 'function' ? it.webkitGetAsEntry() : null;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+    return { files, entries };
+  }
+
+  async function extractDroppedFiles({ files, entries }) {
+    const fileList = Array.isArray(files) ? files : [];
+    const entryList = Array.isArray(entries) ? entries : [];
+    if (entryList.length === 0) {
+      return fileList.map((file) => ({ file, dir: '' }));
+    }
+
+    const hasDirectory = entryList.some((e) => e?.isDirectory === true);
+    if (!hasDirectory) {
+      // フォルダが無い（ファイルのみ）の場合は files を使う方が確実に全件取れる。
+      return fileList.map((file) => ({ file, dir: '' }));
+    }
+
+    const results = [];
+    for (const entry of entryList) {
+      const list = await readEntry(entry, '');
+      for (const x of list) results.push(x);
+    }
+    return results;
+  }
+
+  async function uploadDroppedEntries(entries) {
+    const list = Array.isArray(entries) ? entries.filter((x) => x?.file) : [];
+    if (list.length === 0) return;
+    setUploadBusy(true);
+    try {
+      const dirs = new Set();
+      for (const it of list) {
+        const d = (it.dir ?? '').toString().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+        if (d) dirs.add(d);
+      }
+      for (const d of dirs) {
+        await commands.ensureDirExists(d);
+      }
+
+      for (let i = 0; i < list.length; i += 1) {
+        const it = list[i];
+        const d = (it.dir ?? '').toString().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+        const name = it?.file?.name ? it.file.name : 'file';
+        pushUploadLog(d ? `upload: ${d}/${name}` : `upload: ${name}`);
+        setStatus(list.length > 1 ? `アップロード中... (${i + 1}/${list.length})` : 'アップロード中...');
+        await commands.uploadFileTo(d, it.file, { reload: false });
+      }
+      const { cwd } = store.getState();
+      await commands.reloadDir(cwd, { expand: true });
+      await commands.refresh();
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
   function renderBreadcrumb(p) {
     // パンくず（root / dir1 / dir2 ...）を組み立てる。
     // クリックするとその階層へ navigate。
@@ -940,14 +1128,16 @@ export function createVsCodeExplorerView({ store, commands }) {
       badge.textContent = entry.isDir ? 'DIR' : 'FILE';
 
       const icon = createIconEl(entry);
-      // アイコンのダブルクリックでも open（フォルダは navigate / ファイルは download）
+      // アイコンのダブルクリックでも open（フォルダは navigate / ファイルはコールバック優先）
       icon.ondblclick = (e) => {
         e?.preventDefault?.();
         e?.stopPropagation?.();
         if (entry.isDir) {
           commands.navigate(entry.path);
         } else {
-          commands.download(entry.path);
+          if (!emitOpenFile(entry.path)) {
+            commands.download(entry.path);
+          }
         }
       };
 
@@ -1029,7 +1219,9 @@ export function createVsCodeExplorerView({ store, commands }) {
           if (entry.isDir) {
             commands.navigate(entry.path);
           } else {
-            commands.download(entry.path);
+            if (!emitOpenFile(entry.path)) {
+              commands.download(entry.path);
+            }
           }
         };
         nameEl = a;
@@ -1265,12 +1457,14 @@ export function createVsCodeExplorerView({ store, commands }) {
       item.appendChild(meta);
 
       item.ondblclick = () => {
-        // ダブルクリックで open
+        // ダブルクリックで open（コールバック優先、未設定時はダウンロード）
         if (renameDraft && renameDraft.path === entry.path) return;
         if (entry.isDir) {
           commands.navigate(entry.path);
         } else {
-          commands.download(entry.path);
+          if (!emitOpenFile(entry.path)) {
+            commands.download(entry.path);
+          }
         }
       };
 
@@ -1758,6 +1952,72 @@ export function createVsCodeExplorerView({ store, commands }) {
       };
     }
 
+    if (btnUpload) {
+      // アップロードボタン: モーダルを開く
+      btnUpload.onclick = () => {
+        openUploadModal();
+      };
+    }
+
+    btnUploadClose && (btnUploadClose.onclick = () => closeUploadModal());
+    uploadModalBackdropEl && (uploadModalBackdropEl.onclick = () => closeUploadModal());
+
+    if (btnUploadChoose && fileUpload) {
+      // 「ファイルを選ぶ」ボタンで hidden の input をクリック
+      btnUploadChoose.onclick = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        try {
+          fileUpload.click();
+        } catch {
+          // ignore
+        }
+      };
+    }
+
+    if (uploadDropEl) {
+      // ドロップエリアをクリックしてもファイル選択を開ける
+      uploadDropEl.onclick = (e) => {
+        const t = e?.target;
+        const onButton = t?.closest ? t.closest('button') : null;
+        if (onButton) return;
+        try {
+          fileUpload?.click?.();
+        } catch {
+          // ignore
+        }
+      };
+
+      uploadDropEl.ondragover = (e) => {
+        e.preventDefault();
+        uploadDropEl.classList.add('is-dragover');
+        try {
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        } catch {
+          // ignore
+        }
+      };
+      uploadDropEl.ondragleave = (e) => {
+        const rt = e?.relatedTarget;
+        if (rt && uploadDropEl.contains(rt)) return;
+        uploadDropEl.classList.remove('is-dragover');
+      };
+      uploadDropEl.ondrop = async (e) => {
+        e.preventDefault();
+        uploadDropEl.classList.remove('is-dragover');
+        try {
+          const snap = snapshotDrop(e.dataTransfer);
+          const entries = await extractDroppedFiles(snap);
+          if (!entries || entries.length === 0) return;
+          await uploadDroppedEntries(entries);
+          setStatus('');
+          closeUploadModal();
+        } catch (err) {
+          alert(err?.message ?? String(err));
+        }
+      };
+    }
+
     if (btnViewIcons) {
       btnViewIcons.onclick = () => {
         if (tableEl) tableEl.hidden = true;
@@ -1802,14 +2062,38 @@ export function createVsCodeExplorerView({ store, commands }) {
       rerender();
     };
 
+    if (btnDelete) {
+      // 削除ボタン: 右ペインの複数選択に対して削除を実行
+      btnDelete.onclick = async () => {
+        const currentSelection = Array.from(selectedPaths);
+        const count = currentSelection.length;
+        if (count === 0) return;
+        const label = count === 1 ? (currentSelection[0].split('/').filter(Boolean).pop() ?? currentSelection[0]) : `${count} items`;
+        if (!confirm(`${label} を削除しますか？`)) return;
+        try {
+          if (count === 1) {
+            await commands.deletePath(currentSelection[0]);
+          } else {
+            await commands.deletePaths(currentSelection);
+          }
+          selectedPaths = new Set();
+          selectionAnchorIndex = null;
+          rerender();
+        } catch (e) {
+          alert(e?.message ?? String(e));
+        }
+      };
+    }
+
     fileUpload.onchange = async () => {
       // ファイルアップロード
-      const file = fileUpload.files?.[0];
-      if (!file) return;
+      const files = Array.from(fileUpload.files ?? []);
+      if (files.length === 0) return;
       try {
-        setStatus('アップロード中...');
-        await commands.uploadFile(file);
+        await uploadFiles(files);
         fileUpload.value = '';
+        setStatus('');
+        closeUploadModal();
       } catch (e) {
         fileUpload.value = '';
         alert(e?.message ?? String(e));
@@ -1899,7 +2183,11 @@ export function createVsCodeExplorerView({ store, commands }) {
     btnRefresh && (btnRefresh.hidden = !contentEnabled);
     btnMkdir && (btnMkdir.hidden = !contentEnabled);
     btnTouch && (btnTouch.hidden = !contentEnabled);
-    fileUpload && (fileUpload.closest('.swefm-upload') ? (fileUpload.closest('.swefm-upload').hidden = !contentEnabled) : null);
+    btnDelete && (btnDelete.hidden = !contentEnabled);
+    btnUpload && (btnUpload.hidden = !contentEnabled);
+
+    // 右ペインの選択が空の場合は削除ボタンを disabled
+    if (btnDelete) btnDelete.disabled = selectedPaths.size === 0;
 
     if (!contentEnabled) {
       if (tableEl) tableEl.hidden = true;

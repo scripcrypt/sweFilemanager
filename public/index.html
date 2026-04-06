@@ -26,10 +26,9 @@
           <button id="btn-refresh">更新</button>
           <button id="btn-mkdir">フォルダ作成</button>
           <button id="btn-touch">ファイル作成</button>
-          <label class="swefm-upload">
-            <input id="file-upload" type="file" />
-            <span>アップロード</span>
-          </label>
+          <button id="btn-delete" disabled>削除</button>
+          <button id="btn-upload">アップロード</button>
+          <input id="file-upload" type="file" multiple hidden />
         </div>
       </header>
 
@@ -69,6 +68,27 @@
 
       <!-- エントリポイント（store/commands/view を初期化） -->
       <script type="module" src="./main.js"></script>
+
+      <div id="upload-modal" class="swefm-modal" hidden>
+        <div id="upload-modal-backdrop" class="swefm-modal-backdrop"></div>
+        <div class="swefm-modal-dialog" role="dialog" aria-modal="true" aria-label="Upload">
+          <div id="upload-busy" class="swefm-upload-busy" hidden>
+            <div class="swefm-spinner" aria-hidden="true"></div>
+          </div>
+          <div class="swefm-modal-header">
+            <div class="swefm-modal-title">アップロード</div>
+            <div class="swefm-modal-actions">
+              <button id="btn-upload-choose" class="swefm-btn-primary">ファイルを選ぶ</button>
+              <button id="btn-upload-close" class="swefm-modal-close">閉じる</button>
+            </div>
+          </div>
+          <div id="upload-drop" class="swefm-upload-drop" role="button" tabindex="0">
+            <div class="swefm-upload-drop-title">ここにドラッグ＆ドロップ</div>
+            <div class="swefm-upload-drop-sub">または</div>
+            <div id="upload-log" class="swefm-upload-log" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </body>
 </html>
