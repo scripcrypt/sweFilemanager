@@ -1,6 +1,6 @@
 FROM dunglas/frankenphp:php8.4.19-bookworm
 
-# 1. GDのインストール（ここは成功実績があるので維持）
+# 1. GDのインストール
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg62-turbo-dev \
@@ -13,14 +13,13 @@ RUN apt-get update && apt-get install -y \
 COPY . /app
 WORKDIR /app
 
-# 3. 実行権限の付与
+# 3. 権限設定
 RUN chown -R www-data:www-data /app
 
-# 4. ポートとドメインの設定
-# Railwayのポート（8080）で待ち受け、自動HTTPS（Caddyの機能）をオフにします
-ENV SERVER_NAME=:8080
-ENV CADDY_GLOBAL_OPTIONS="local_certs"
+# 4. ここが最重要：Railwayのポート8080で、HTTPのみで待機する設定
+# SERVER_NAMEに「http://」を付け、ポートを指定します
+ENV SERVER_NAME="http://:8080"
+ENV FRANKENPHP_CONFIG="import /etc/caddy/Caddyfile"
 
-# 5. 標準の起動コマンド
-# これにより、URLパスに応じたPHPファイル（index.php, img.php等）が実行されます
+# 5. 起動コマンド（デフォルトを尊重しつつポートを明示）
 CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
