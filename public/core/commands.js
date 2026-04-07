@@ -276,12 +276,13 @@ export function createCommands({ api, store }) {
 
   function getThumbUrl(path, { w = 160, h = 160, fit = 'cover', fmt = 'webp', q = 80 } = {}) {
     // サムネ取得用URL。
-    // - /thumb/<root>/<path> にアクセスし、img.php（rewrite）経由で縮小画像を取得する。
+    // - Railway 等の環境では rewrite/PATH_INFO の扱いがまちまちなので、
+    //   /img.php?root=...&path=... のクエリ形式で確実に渡す。
     const { currentRoot } = store.getState();
     const apiUrl = new URL(api.downloadUrl({ root: currentRoot, path: '' }), window.location.href);
-    const thumbBase = new URL('../thumb/', apiUrl);
-    const rel = `${encodeURIComponent(currentRoot ?? '')}/${encodePathSegments(path)}`;
-    const u = new URL(rel, thumbBase);
+    const u = new URL('../img.php', apiUrl);
+    u.searchParams.set('root', (currentRoot ?? '').toString());
+    u.searchParams.set('path', (path ?? '').toString());
     u.searchParams.set('w', String(w));
     u.searchParams.set('h', String(h));
     u.searchParams.set('fit', (fit ?? 'cover').toString());
