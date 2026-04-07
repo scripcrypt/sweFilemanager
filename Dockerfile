@@ -1,6 +1,6 @@
 FROM dunglas/frankenphp:php8.4.19-bookworm
 
-# 1. GDのインストール（ここは成功していたのでそのまま）
+# 1. GDのインストール（ここは維持）
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg62-turbo-dev \
@@ -12,13 +12,14 @@ RUN apt-get update && apt-get install -y \
 # 2. ファイルのコピー
 COPY . /app
 
-# 3. Railwayの環境変数 PORT に対応させるための設定
-# FrankenPHP(Caddy)にポートを教え、ドメイン制限を解除します
-ENV SERVER_NAME=:8080
-ENV CADDY_GLOBAL_OPTIONS="local_certs"
-
-# 実行権限の付与（念のため）
+# 3. 実行権限
 RUN chown -R www-data:www-data /app
 
-# 実行コマンド（FrankenPHPの標準起動）
-CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
+# 4. 重要：Caddyの設定を「ファイルの実体優先」に強制
+# SERVER_NAME を指定しつつ、ドキュメントルートを明示します
+ENV SERVER_NAME=:8080
+ENV FRANKENPHP_CONFIG="root /app"
+
+# 念のため、以前作った info.php が残っていれば削除するか、
+# 下記コマンドで「普通のPHPサーバー」として起動させます
+CMD ["frankenphp", "php-server", "--port", "8080", "--root", "/app"]
