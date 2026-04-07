@@ -90,6 +90,13 @@ export function createCommands({ api, store }) {
     await refresh();
   }
 
+  async function openDir(path) {
+    // 右ペインだけを指定ディレクトリに切り替える。
+    // - ツリーは自動展開しない（シングルクリックでツリーが開いてしまうのを防ぐ）
+    store.setState({ cwd: (path ?? '').toString() });
+    await refresh();
+  }
+
   async function copyPaths(destDir, paths) {
     // 複数パスのコピー。
     // - サーバ側で再帰コピー（ディレクトリも対象）
@@ -274,6 +281,7 @@ export function createCommands({ api, store }) {
 
   return {
     navigate,
+    openDir,
     refresh,
     changeRoot,
     createFolder,

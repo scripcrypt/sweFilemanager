@@ -88,6 +88,13 @@ export function createVsCodeExplorerView({ store, commands }) {
   let lastCtxX = 0;
   let lastCtxY = 0;
 
+  // 右ペイン: 選択状態の表示は DOM を差し替えずに更新する。
+  // DOM を作り直す rerender() を避けることで、
+  // - 選択だけで一覧が再読み込みっぽく見える
+  // - dblclick が成立しづらい
+  // を防ぐ。
+  let selectionUiRaf = null;
+
   // 右ペイン: クリップボード（copy/cut）
   // - mode: 'copy' | 'cut' | null
   // - paths: 対象パス配列
@@ -115,6 +122,86 @@ export function createVsCodeExplorerView({ store, commands }) {
   // 左ツリー: インラインリネーム状態
   let treeRenameDraft = null;
 
+  // アイコン画像キャッシュ（URL -> HTMLImageElement）
+  // - 再描画のたびに <img> を作り直すとチラつきや再デコードが起きやすいので、
+  //   src ごとに 1 つだけ保持し、cloneNode() で使い回す。
+  const iconImgCache = new Map();
+
+  const iconObjectUrlCache = new Map();
+
+  const thumbObjectUrlCache = new Map();
+
+  const transparentPixelDataUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
+  function normalizeIconUrl(url) {
+    if (!url) return '';
+    try {
+      return new URL(url, window.location.href).toString();
+    } catch {
+      return url;
+    }
+  }
+
+  function warmIconObjectUrl(url) {
+    const key = normalizeIconUrl(url);
+    if (!key) return;
+    const prev = iconObjectUrlCache.get(key);
+    if (prev?.objectUrl) return;
+    if (prev?.promise) return;
+    const promise = (async () => {
+      try {
+        const res = await fetch(key, { cache: 'force-cache', credentials: 'same-origin' });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        iconObjectUrlCache.set(key, { objectUrl, promise: null });
+
+        try {
+          appRootEl
+            ?.querySelectorAll?.(`img[data-icon-url="${CSS.escape(key)}"]`)
+            ?.forEach?.((img) => {
+              if (img && img.src !== objectUrl) img.src = objectUrl;
+            });
+        } catch {
+          // ignore
+        }
+      } catch {
+        iconObjectUrlCache.set(key, { objectUrl: '', promise: null });
+      }
+    })();
+    iconObjectUrlCache.set(key, { objectUrl: '', promise });
+  }
+
+  function warmThumbObjectUrl({ url, cacheKey }) {
+    const normalizedUrl = normalizeIconUrl(url);
+    const key = (cacheKey ?? normalizedUrl ?? '').toString();
+    if (!normalizedUrl || !key) return;
+    const prev = thumbObjectUrlCache.get(key);
+    if (prev?.objectUrl) return;
+    if (prev?.promise) return;
+    const promise = (async () => {
+      try {
+        const res = await fetch(normalizedUrl, { cache: 'force-cache', credentials: 'same-origin' });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        thumbObjectUrlCache.set(key, { objectUrl, promise: null });
+        try {
+          appRootEl
+            ?.querySelectorAll?.(`img[data-thumb-key="${CSS.escape(key)}"]`)
+            ?.forEach?.((img) => {
+              if (img && img.src !== objectUrl) img.src = objectUrl;
+            });
+        } catch {
+          // ignore
+        }
+      } catch {
+        thumbObjectUrlCache.set(key, { objectUrl: '', promise: null });
+      }
+    })();
+    thumbObjectUrlCache.set(key, { objectUrl: '', promise });
+  }
+
   function resolveIconUrl(entry) {
     // 画像アイコン設定（config.json の icons）に基づいて、表示すべき URL を決める。
     // - folder / file / ext マップ（拡張子別）
@@ -139,6 +226,19 @@ export function createVsCodeExplorerView({ store, commands }) {
     // - 無ければ従来の <span class="icon ...">（CSS mask）
     const url = resolveIconUrl(entry);
     if (url) {
+      const key = normalizeIconUrl(url);
+      const cached = iconObjectUrlCache.get(key);
+      if (!cached || !cached.objectUrl) warmIconObjectUrl(key);
+
+      let base = iconImgCache.get(key);
+      if (!base) {
+        base = new Image();
+        base.alt = '';
+        base.decoding = 'async';
+        base.src = cached?.objectUrl || key;
+        iconImgCache.set(key, base);
+      }
+
       const img = document.createElement('img');
       img.className = `swefm-icon-img${extraClass ? ` ${extraClass}` : ''}`;
       img.width = size;
@@ -146,7 +246,14 @@ export function createVsCodeExplorerView({ store, commands }) {
       img.alt = '';
       img.decoding = 'async';
       img.loading = 'lazy';
-      img.src = url;
+      img.setAttribute('data-icon-url', key);
+
+      const next = iconObjectUrlCache.get(key);
+      if (next?.objectUrl) {
+        img.src = next.objectUrl;
+      } else {
+        img.src = key;
+      }
       return img;
     }
 
@@ -422,6 +529,34 @@ export function createVsCodeExplorerView({ store, commands }) {
       rerender();
     }
   });
+
+  document.addEventListener(
+    'click',
+    (e) => {
+      // href="#" のリンクが残っていると、preventDefault が漏れた場合に
+      // ハッシュ遷移（見た目のリロード/スクロール）が起きるためガードする。
+      const t = e?.target;
+      const a = t?.closest ? t.closest('a') : null;
+      if (!a) return;
+      if (a.getAttribute('href') !== '#') return;
+      if (appRootEl && !appRootEl.contains(a)) return;
+      e.preventDefault();
+    },
+    true
+  );
+
+  window.addEventListener('beforeunload', () => {
+    try {
+      for (const v of iconObjectUrlCache.values()) {
+        if (v?.objectUrl) URL.revokeObjectURL(v.objectUrl);
+      }
+      for (const v of thumbObjectUrlCache.values()) {
+        if (v?.objectUrl) URL.revokeObjectURL(v.objectUrl);
+      }
+    } catch {
+      // ignore
+    }
+  });
   document.addEventListener('keydown', (e) => {
     // キーボードショートカット。
     // - Esc: メニュー/プロパティを閉じる
@@ -509,6 +644,43 @@ export function createVsCodeExplorerView({ store, commands }) {
     return (clipboard?.mode === 'copy' || clipboard?.mode === 'cut') && Array.isArray(clipboard.paths) && clipboard.paths.length > 0;
   }
 
+  function cancelSelectionRerender() {
+    if (selectionUiRaf != null) {
+      cancelAnimationFrame(selectionUiRaf);
+      selectionUiRaf = null;
+    }
+  }
+
+  function rerenderSelectionOnly() {
+    if (btnDelete) btnDelete.disabled = selectedPaths.size === 0;
+
+    try {
+      tbody?.querySelectorAll?.('tr[data-path]')?.forEach?.((tr) => {
+        const p = tr.getAttribute('data-path') ?? '';
+        tr.classList.toggle('selected', selectedPaths.has(p));
+      });
+    } catch {
+      // ignore
+    }
+
+    try {
+      gridEl?.querySelectorAll?.('.grid-item[data-path]')?.forEach?.((el) => {
+        const p = el.getAttribute('data-path') ?? '';
+        el.classList.toggle('selected', selectedPaths.has(p));
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  function scheduleSelectionRerender() {
+    cancelSelectionRerender();
+    selectionUiRaf = requestAnimationFrame(() => {
+      selectionUiRaf = null;
+      rerenderSelectionOnly();
+    });
+  }
+
   async function doPaste() {
     if (!canPaste()) return;
     const { cwd } = store.getState();
@@ -530,7 +702,7 @@ export function createVsCodeExplorerView({ store, commands }) {
   function setSelectionOnly(path, { anchorIndex = null } = {}) {
     selectedPaths = new Set(path ? [path] : []);
     selectionAnchorIndex = anchorIndex;
-    rerender();
+    scheduleSelectionRerender();
   }
 
   function toggleSelection(path, { anchorIndex = null } = {}) {
@@ -539,7 +711,7 @@ export function createVsCodeExplorerView({ store, commands }) {
     else next.add(path);
     selectedPaths = next;
     selectionAnchorIndex = anchorIndex;
-    rerender();
+    scheduleSelectionRerender();
   }
 
   function setSelectionRange(pathsInOrder, fromIdx, toIdx) {
@@ -551,7 +723,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       if (p) next.add(p);
     }
     selectedPaths = next;
-    rerender();
+    scheduleSelectionRerender();
   }
 
   function handleSelectClick(e, entry, index, pathsInOrder) {
@@ -961,6 +1133,8 @@ export function createVsCodeExplorerView({ store, commands }) {
       const target = segs[i];
       a.onclick = (e) => {
         e.preventDefault();
+        const { cwd } = store.getState();
+        if ((cwd ?? '') === (target ?? '')) return;
         commands.navigate(target);
       };
       breadcrumb.appendChild(a);
@@ -1056,6 +1230,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       const entry = effectiveListing[i];
       const tr = document.createElement('tr');
       if (entry.isDir) tr.classList.add('is-dir');
+      if (!entry.__draft) tr.setAttribute('data-path', entry.path);
       if (!entry.__draft && selectedPaths.has(entry.path)) tr.classList.add('selected');
 
       const realIndex = entry.__draft ? -1 : pathsInOrder.indexOf(entry.path);
@@ -1132,6 +1307,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       icon.ondblclick = (e) => {
         e?.preventDefault?.();
         e?.stopPropagation?.();
+        cancelSelectionRerender();
         if (entry.isDir) {
           commands.navigate(entry.path);
         } else {
@@ -1216,6 +1392,7 @@ export function createVsCodeExplorerView({ store, commands }) {
         };
         a.ondblclick = (e) => {
           e.preventDefault();
+          cancelSelectionRerender();
           if (entry.isDir) {
             commands.navigate(entry.path);
           } else {
@@ -1310,6 +1487,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       const item = document.createElement('div');
       item.className = 'grid-item';
       if (entry.isDir) item.classList.add('is-dir');
+      item.setAttribute('data-path', entry.path);
       if (selectedPaths.has(entry.path)) item.classList.add('selected');
 
       const realIndex = pathsInOrder.indexOf(entry.path);
@@ -1376,7 +1554,19 @@ export function createVsCodeExplorerView({ store, commands }) {
         img.className = 'grid-thumb';
         img.loading = 'lazy';
         img.alt = entry.name;
-        img.src = commands.getDownloadUrl(entry.path);
+        const url = commands.getDownloadUrl(entry.path);
+        const normalizedUrl = normalizeIconUrl(url);
+        const thumbKey = `${normalizedUrl}|${entry.mtimeMs ?? ''}|${entry.size ?? ''}`;
+        img.setAttribute('data-thumb-key', thumbKey);
+        const cached = thumbObjectUrlCache.get(thumbKey);
+        if (cached?.objectUrl) {
+          img.src = cached.objectUrl;
+        } else {
+          // プレースホルダ方式: キャッシュができるまでネットワークURLを img.src に入れない
+          // （DevTools の Network で毎回表示されるのが分かりづらい + 重い画像が多いと負荷が高い）
+          img.src = transparentPixelDataUrl;
+          warmThumbObjectUrl({ url: normalizedUrl, cacheKey: thumbKey });
+        }
         top.appendChild(img);
       } else {
         const icon = createIconEl(entry, { size: 56, extraClass: 'grid-icon' });
@@ -1459,6 +1649,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       item.ondblclick = () => {
         // ダブルクリックで open（コールバック優先、未設定時はダウンロード）
         if (renameDraft && renameDraft.path === entry.path) return;
+        cancelSelectionRerender();
         if (entry.isDir) {
           commands.navigate(entry.path);
         } else {
@@ -1525,9 +1716,15 @@ export function createVsCodeExplorerView({ store, commands }) {
 
     const visiblePaths = rows.map((r) => (r.entry ? r.entry.path : r.p));
 
-    function rerenderTreeOnly() {
-      // ツリーだけ再描画したい（右ペインはそのまま）場合のトリガー
-      store.setState((s) => s);
+    function updateTreeSelectionUI() {
+      try {
+        treeEl?.querySelectorAll?.('.tree-item[data-path]')?.forEach?.((el) => {
+          const p = el.getAttribute('data-path') ?? '';
+          el.setAttribute('aria-selected', selectedTreePaths.has(p) ? 'true' : 'false');
+        });
+      } catch {
+        // ignore
+      }
     }
 
     function treeSetSelectionOnly(path, { anchorIndex = null } = {}) {
@@ -1535,7 +1732,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       selectedTreePaths = new Set(path == null ? [] : [path]);
       treeSelectionAnchorIndex = anchorIndex;
       emitTreeSelection(Array.from(selectedTreePaths));
-      rerenderTreeOnly();
+      updateTreeSelectionUI();
     }
 
     function treeToggleSelection(path, { anchorIndex = null } = {}) {
@@ -1546,7 +1743,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       selectedTreePaths = next;
       treeSelectionAnchorIndex = anchorIndex;
       emitTreeSelection(Array.from(selectedTreePaths));
-      rerenderTreeOnly();
+      updateTreeSelectionUI();
     }
 
     function treeRangeSelect(toIndex) {
@@ -1562,7 +1759,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       }
       selectedTreePaths = next;
       emitTreeSelection(Array.from(selectedTreePaths));
-      rerenderTreeOnly();
+      updateTreeSelectionUI();
     }
 
     function treeHandleSelectClick(e, path, index) {
@@ -1591,6 +1788,7 @@ export function createVsCodeExplorerView({ store, commands }) {
         item.className = 'tree-item';
         if ((cwd ?? '') === row.entry.path) item.classList.add('is-cwd');
         item.setAttribute('role', 'treeitem');
+        item.setAttribute('data-path', row.entry.path);
         item.setAttribute('aria-selected', selectedTreePaths.has(row.entry.path) ? 'true' : 'false');
 
         for (let i = 0; i < row.depth; i += 1) {
@@ -1648,6 +1846,11 @@ export function createVsCodeExplorerView({ store, commands }) {
           e?.stopPropagation?.();
           if (treeRenameDraft && treeRenameDraft.path === row.entry.path) return;
           const idx = visiblePaths.indexOf(row.entry.path);
+          if (isDir && e.shiftKey !== true && e.ctrlKey !== true && e.metaKey !== true) {
+            treeSetSelectionOnly(row.entry.path, { anchorIndex: idx });
+            commands.openDir(row.entry.path).catch((err) => alert(err?.message ?? String(err)));
+            return;
+          }
           treeHandleSelectClick(e, row.entry.path, idx);
         };
 
@@ -1765,6 +1968,7 @@ export function createVsCodeExplorerView({ store, commands }) {
       item.className = 'tree-item';
       if ((cwd ?? '') === row.p) item.classList.add('is-cwd');
       item.setAttribute('role', 'treeitem');
+      item.setAttribute('data-path', row.p);
       item.setAttribute('aria-selected', selectedTreePaths.has(row.p) ? 'true' : 'false');
 
       for (let i = 0; i < row.depth; i += 1) {
@@ -1788,7 +1992,7 @@ export function createVsCodeExplorerView({ store, commands }) {
           } else {
             commands.setNodeState(row.p, { expanded: !row.st.expanded });
           }
-          store.setState((s) => s);
+          await renderTree(store.getState().cwd);
         } catch (err) {
           alert(err?.message ?? String(err));
         }
@@ -1837,6 +2041,11 @@ export function createVsCodeExplorerView({ store, commands }) {
         e?.stopPropagation?.();
         if (treeRenameDraft && treeRenameDraft.path === row.p) return;
         const idx = visiblePaths.indexOf(row.p);
+        if (e.shiftKey !== true && e.ctrlKey !== true && e.metaKey !== true) {
+          treeSetSelectionOnly(row.p, { anchorIndex: idx });
+          commands.openDir(row.p).catch((err) => alert(err?.message ?? String(err)));
+          return;
+        }
         treeHandleSelectClick(e, row.p, idx);
       };
 
