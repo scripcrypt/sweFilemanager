@@ -142,53 +142,23 @@ export function createVsCodeExplorerView({ store, commands }) {
     }
   }
 
-  function warmIconObjectUrl(url) {
-    const key = normalizeIconUrl(url);
-    if (!key) return;
-    const prev = iconObjectUrlCache.get(key);
+  function warmObjectUrlCache({ normalizedUrl, cache, cacheKey, queryAttr }) {
+    if (!normalizedUrl || !cacheKey) return;
+    const prev = cache.get(cacheKey);
     if (prev?.objectUrl) return;
     if (prev?.promise) return;
-    const promise = (async () => {
-      try {
-        const res = await fetch(key, { cache: 'force-cache', credentials: 'same-origin' });
-        if (!res.ok) return;
-        const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        iconObjectUrlCache.set(key, { objectUrl, promise: null });
 
-        try {
-          appRootEl
-            ?.querySelectorAll?.(`img[data-icon-url="${CSS.escape(key)}"]`)
-            ?.forEach?.((img) => {
-              if (img && img.src !== objectUrl) img.src = objectUrl;
-            });
-        } catch {
-          // ignore
-        }
-      } catch {
-        iconObjectUrlCache.set(key, { objectUrl: '', promise: null });
-      }
-    })();
-    iconObjectUrlCache.set(key, { objectUrl: '', promise });
-  }
-
-  function warmThumbObjectUrl({ url, cacheKey }) {
-    const normalizedUrl = normalizeIconUrl(url);
-    const key = (cacheKey ?? normalizedUrl ?? '').toString();
-    if (!normalizedUrl || !key) return;
-    const prev = thumbObjectUrlCache.get(key);
-    if (prev?.objectUrl) return;
-    if (prev?.promise) return;
     const promise = (async () => {
       try {
         const res = await fetch(normalizedUrl, { cache: 'force-cache', credentials: 'same-origin' });
         if (!res.ok) return;
         const blob = await res.blob();
         const objectUrl = URL.createObjectURL(blob);
-        thumbObjectUrlCache.set(key, { objectUrl, promise: null });
+        cache.set(cacheKey, { objectUrl, promise: null });
+
         try {
           appRootEl
-            ?.querySelectorAll?.(`img[data-thumb-key="${CSS.escape(key)}"]`)
+            ?.querySelectorAll?.(`img[${queryAttr}="${CSS.escape(cacheKey)}"]`)
             ?.forEach?.((img) => {
               if (img && img.src !== objectUrl) img.src = objectUrl;
             });
@@ -196,10 +166,24 @@ export function createVsCodeExplorerView({ store, commands }) {
           // ignore
         }
       } catch {
-        thumbObjectUrlCache.set(key, { objectUrl: '', promise: null });
+        cache.set(cacheKey, { objectUrl: '', promise: null });
       }
     })();
-    thumbObjectUrlCache.set(key, { objectUrl: '', promise });
+
+    cache.set(cacheKey, { objectUrl: '', promise });
+  }
+
+  function warmIconObjectUrl(url) {
+    const key = normalizeIconUrl(url);
+    if (!key) return;
+    warmObjectUrlCache({ normalizedUrl: key, cache: iconObjectUrlCache, cacheKey: key, queryAttr: 'data-icon-url' });
+  }
+
+  function warmThumbObjectUrl({ url, cacheKey }) {
+    const normalizedUrl = normalizeIconUrl(url);
+    const key = (cacheKey ?? normalizedUrl ?? '').toString();
+    if (!normalizedUrl || !key) return;
+    warmObjectUrlCache({ normalizedUrl, cache: thumbObjectUrlCache, cacheKey: key, queryAttr: 'data-thumb-key' });
   }
 
   function resolveIconUrl(entry) {
