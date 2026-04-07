@@ -1538,7 +1538,7 @@ export function createVsCodeExplorerView({ store, commands }) {
         img.className = 'grid-thumb';
         img.loading = 'lazy';
         img.alt = entry.name;
-        const url = commands.getDownloadUrl(entry.path);
+        const url = commands.getThumbUrl(entry.path, { w: 160, h: 160, fit: 'cover', fmt: 'webp', q: 80 });
         const normalizedUrl = normalizeIconUrl(url);
         const thumbKey = `${normalizedUrl}|${entry.mtimeMs ?? ''}|${entry.size ?? ''}`;
         img.setAttribute('data-thumb-key', thumbKey);

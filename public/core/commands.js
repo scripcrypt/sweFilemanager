@@ -264,6 +264,32 @@ export function createCommands({ api, store }) {
     return api.downloadUrl({ root: currentRoot, path });
   }
 
+  function encodePathSegments(p) {
+    const raw = (p ?? '').toString();
+    if (!raw) return '';
+    return raw
+      .split('/')
+      .filter((s) => s !== '')
+      .map((s) => encodeURIComponent(s))
+      .join('/');
+  }
+
+  function getThumbUrl(path, { w = 160, h = 160, fit = 'cover', fmt = 'webp', q = 80 } = {}) {
+    // サムネ取得用URL。
+    // - /thumb/<root>/<path> にアクセスし、img.php（rewrite）経由で縮小画像を取得する。
+    const { currentRoot } = store.getState();
+    const apiUrl = new URL(api.downloadUrl({ root: currentRoot, path: '' }), window.location.href);
+    const thumbBase = new URL('../thumb/', apiUrl);
+    const rel = `${encodeURIComponent(currentRoot ?? '')}/${encodePathSegments(path)}`;
+    const u = new URL(rel, thumbBase);
+    u.searchParams.set('w', String(w));
+    u.searchParams.set('h', String(h));
+    u.searchParams.set('fit', (fit ?? 'cover').toString());
+    u.searchParams.set('fmt', (fmt ?? 'webp').toString());
+    u.searchParams.set('q', String(q));
+    return u.toString();
+  }
+
   function getTreeState() {
     // View から参照するために treeState を返す
     return treeState;
@@ -297,6 +323,7 @@ export function createCommands({ api, store }) {
     statPath,
     download,
     getDownloadUrl,
+    getThumbUrl,
     loadDirs,
     setNodeState,
     getTreeState,
