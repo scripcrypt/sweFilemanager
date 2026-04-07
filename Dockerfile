@@ -1,6 +1,6 @@
 FROM dunglas/frankenphp:php8.4.19-bookworm
 
-# 1. GDのインストール
+# 1. GDのインストール（ここは成功しているので維持）
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg62-turbo-dev \
@@ -16,10 +16,6 @@ WORKDIR /app
 # 3. 権限設定
 RUN chown -R www-data:www-data /app
 
-# 4. ここが最重要：Railwayのポート8080で、HTTPのみで待機する設定
-# SERVER_NAMEに「http://」を付け、ポートを指定します
-ENV SERVER_NAME="http://:8080"
-ENV FRANKENPHP_CONFIG="import /etc/caddy/Caddyfile"
-
-# 5. 起動コマンド（デフォルトを尊重しつつポートを明示）
-CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
+# 4. 実行コマンドを「PHP組み込みサーバー」に直撃させる
+# 0.0.0.0（すべてのインターフェース）の8080番で、/appを公開
+CMD ["php", "-S", "0.0.0.0:8080", "-t", "/app"]
