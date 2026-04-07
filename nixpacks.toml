@@ -1,5 +1,0 @@
-[phases.setup]
-nixPkgs = ['php84', 'php84Extensions.gd', 'libgd', 'pkg-config']
-
-[variables]
-NIXPACKS_PHP_EXTENSIONS = 'gd'
