@@ -157,11 +157,14 @@ export function createVsCodeExplorerView({ store, commands }) {
         cache.set(cacheKey, { objectUrl, promise: null });
 
         try {
-          appRootEl
-            ?.querySelectorAll?.(`img[${queryAttr}="${CSS.escape(cacheKey)}"]`)
-            ?.forEach?.((img) => {
-              if (img && img.src !== objectUrl) img.src = objectUrl;
-            });
+          // cacheKey には URL + mtime/size などが入り、`&` `=` `|` など
+          // セレクタで扱いづらい文字が含まれるため、属性の値で直接比較する。
+          appRootEl?.querySelectorAll?.(`img[${queryAttr}]`)?.forEach?.((img) => {
+            if (!img) return;
+            const v = typeof img.getAttribute === 'function' ? img.getAttribute(queryAttr) : '';
+            if (v !== cacheKey) return;
+            if (img.src !== objectUrl) img.src = objectUrl;
+          });
         } catch {
           // ignore
         }
