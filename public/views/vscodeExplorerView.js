@@ -61,6 +61,7 @@ export function createVsCodeExplorerView({ store, commands }) {
 
   const btnUp = document.getElementById('btn-up');
   const btnRefresh = document.getElementById('btn-refresh');
+  const btnClearCache = document.getElementById('btn-clear-cache');
   const btnMkdir = document.getElementById('btn-mkdir');
   const btnTouch = document.getElementById('btn-touch');
   const btnDelete = document.getElementById('btn-delete');
@@ -132,6 +133,24 @@ export function createVsCodeExplorerView({ store, commands }) {
   const thumbObjectUrlCache = new Map();
 
   const transparentPixelDataUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
+  function clearObjectUrlCache(cache) {
+    try {
+      for (const v of cache.values()) {
+        const u = v?.objectUrl;
+        if (u) {
+          try {
+            URL.revokeObjectURL(u);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    cache.clear();
+  }
 
   function normalizeIconUrl(url) {
     if (!url) return '';
@@ -2243,6 +2262,22 @@ export function createVsCodeExplorerView({ store, commands }) {
         alert(e?.message ?? String(e));
       }
     };
+
+    if (btnClearCache) {
+      btnClearCache.onclick = async () => {
+        // アイコン/サムネの objectURL キャッシュを破棄し、必要なら再取得させる。
+        // - メモリ使用量のリセットや、表示崩れ/古いサムネの解消に使う。
+        setStatus('キャッシュをクリアしました');
+        clearObjectUrlCache(iconObjectUrlCache);
+        clearObjectUrlCache(thumbObjectUrlCache);
+        iconImgCache.clear();
+        try {
+          await commands.refresh();
+        } catch {
+          // ignore
+        }
+      };
+    }
 
     btnMkdir.onclick = async () => {
       // フォルダ作成: 入力行を出す
