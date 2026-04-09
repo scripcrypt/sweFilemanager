@@ -115,6 +115,21 @@ function read_int(string $k, int $def, int $min, int $max): int {
     return $n;
 }
 
+function output_image($img, string $fmt, int $q): void {
+    if ($fmt === 'png') {
+        header('Content-Type: image/png');
+        imagepng($img);
+        return;
+    }
+    if ($fmt === 'jpeg') {
+        header('Content-Type: image/jpeg');
+        imagejpeg($img, null, $q);
+        return;
+    }
+    header('Content-Type: image/webp');
+    imagewebp($img, null, $q);
+}
+
 function send_error(int $code, string $msg): void {
     http_response_code($code);
     header('Content-Type: text/plain; charset=utf-8');
@@ -210,14 +225,18 @@ try {
     if (!is_dir($cacheDir)) {
         @mkdir($cacheDir, 0775, true);
     }
-    $cacheFile = $cacheDir . '/' . trim($etag, '"') . '.' . $fmt;
-    if (is_file($cacheFile)) {
-        header('Cache-Control: public, max-age=31536000, immutable');
-        if ($fmt === 'png') header('Content-Type: image/png');
-        elseif ($fmt === 'jpeg') header('Content-Type: image/jpeg');
-        else header('Content-Type: image/webp');
-        readfile($cacheFile);
-        exit;
+
+    $cacheWritable = is_dir($cacheDir) && is_writable($cacheDir);
+    if ($cacheWritable) {
+        $cacheFile = $cacheDir . '/' . trim($etag, '"') . '.' . $fmt;
+        if (is_file($cacheFile)) {
+            header('Cache-Control: public, max-age=31536000, immutable');
+            if ($fmt === 'png') header('Content-Type: image/png');
+            elseif ($fmt === 'jpeg') header('Content-Type: image/jpeg');
+            else header('Content-Type: image/webp');
+            readfile($cacheFile);
+            exit;
+        }
     }
 
     if (!function_exists('imagecreatefromstring')) {
@@ -257,27 +276,40 @@ try {
 
     $ok = false;
     if ($fmt === 'png') {
-        $ok = @imagepng($dst, $cacheFile);
+        $ok = $cacheWritable ? @imagepng($dst, $cacheFile) : false;
         header('Content-Type: image/png');
     } elseif ($fmt === 'jpeg') {
-        $ok = @imagejpeg($dst, $cacheFile, $q);
+        $ok = $cacheWritable ? @imagejpeg($dst, $cacheFile, $q) : false;
         header('Content-Type: image/jpeg');
     } else {
         if (!function_exists('imagewebp')) {
             $fmt = 'jpeg';
-            $cacheFile = $cacheDir . '/' . trim($etag, '"') . '.jpeg';
-            $ok = @imagejpeg($dst, $cacheFile, $q);
+            if ($cacheWritable) {
+                $cacheFile = $cacheDir . '/' . trim($etag, '"') . '.jpeg';
+                $ok = @imagejpeg($dst, $cacheFile, $q);
+            }
             header('Content-Type: image/jpeg');
         } else {
-            $ok = @imagewebp($dst, $cacheFile, $q);
+            $ok = $cacheWritable ? @imagewebp($dst, $cacheFile, $q) : false;
             header('Content-Type: image/webp');
         }
     }
-    imagedestroy($dst);
 
-    if (!$ok || !is_file($cacheFile)) {
-        send_error(500, 'Failed to generate thumb');
+    if (!$ok || !$cacheWritable || !isset($cacheFile) || !is_file($cacheFile)) {
+        header('Cache-Control: no-store');
+        if ($fmt === 'webp' && !function_exists('imagewebp')) {
+            $fmt = 'jpeg';
+        }
+        if ($fmt === 'webp') {
+            output_image($dst, 'webp', $q);
+        } else {
+            output_image($dst, $fmt, $q);
+        }
+        imagedestroy($dst);
+        exit;
     }
+
+    imagedestroy($dst);
 
     header('Cache-Control: public, max-age=31536000, immutable');
     readfile($cacheFile);
