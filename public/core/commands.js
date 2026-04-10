@@ -283,6 +283,9 @@ export function createCommands({ api, store }) {
     const u = new URL('../img.php', apiUrl);
     u.searchParams.set('root', (currentRoot ?? '').toString());
     u.searchParams.set('path', (path ?? '').toString());
+    // rootPath が api 経由で付与されていれば img.php にも引き継ぐ
+    const rootPath = apiUrl.searchParams.get('rootPath');
+    if (rootPath) u.searchParams.set('rootPath', rootPath);
     u.searchParams.set('w', String(w));
     u.searchParams.set('h', String(h));
     u.searchParams.set('fit', (fit ?? 'cover').toString());

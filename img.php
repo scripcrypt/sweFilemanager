@@ -74,6 +74,10 @@ function resolve_root(array $cfg, string $rootKey, string $projectRoot): string 
         $rootKey = $found;
     }
     $rootDef = $cfg['roots'][$rootKey];
+    // コール時に rootPath パラメータが渡された場合は config.json のパスより優先する
+    if (isset($_GET['rootPath']) && is_string($_GET['rootPath']) && $_GET['rootPath'] !== '') {
+        $rootDef['path'] = $_GET['rootPath'];
+    }
     $relPath = isset($rootDef['path']) && is_string($rootDef['path']) ? $rootDef['path'] : '';
     if ($relPath === '') {
         throw new RuntimeException('Invalid root path', 500);

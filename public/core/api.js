@@ -51,9 +51,10 @@ async function apiJson(url, init) {
   return data;
 }
 
-export function createApi({ baseUrl }) {
+export function createApi({ baseUrl, rootPath }) {
   // API クライアント。
   // - `baseUrl` は `public/api.php` を想定（`action=` で分岐）
+  // - `rootPath` が指定された場合、全リクエストに付与して config.json のパスを上書きする
   const base = new URL(baseUrl ?? './public/api.php', window.location.href);
 
   function apiUrl(action, { root, ...params } = {}) {
@@ -62,6 +63,7 @@ export function createApi({ baseUrl }) {
     const u = new URL(base);
     u.searchParams.set('action', action);
     if (root) u.searchParams.set('root', root);
+    if (rootPath) u.searchParams.set('rootPath', rootPath);
     for (const [k, v] of Object.entries(params)) {
       if (v == null) continue;
       u.searchParams.set(k, v);

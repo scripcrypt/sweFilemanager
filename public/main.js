@@ -10,7 +10,10 @@ import { createVsCodeExplorerView } from './views/vscodeExplorerView.js';
 // - プロジェクト直下の `index.html` から `./public/main.js` を読み、`./public/api.php` を叩く
 // - Railway 等で `public/` の中身がサイトルート（`/`）に配置され、`/api.php` を叩く
 const apiBaseUrl = new URL('./api.php', import.meta.url).toString();
-const api = createApi({ baseUrl: apiBaseUrl });
+// 呼び出し元（sweEditor 等）が iframe URL に rootPath を付与した場合、それを引き継ぐ
+const _fmParams = new URLSearchParams(window.location.search);
+const _rootPath = _fmParams.get('rootPath') ?? undefined;
+const api = createApi({ baseUrl: apiBaseUrl, rootPath: _rootPath });
 
 // ディレクトリごとの表示モード（list/icons）を永続化する Cookie 名
 const VIEWMODE_COOKIE = 'sweFilemanager.viewModeByDir';
